@@ -36,4 +36,4 @@ int mhl_disconnect_register_notifier(struct t_mhl_disconnect_notifier *);
 static LIST_HEAD(g_lh_mhl_disconnect_notifier_list);
 #endif
 
-#endif 
+#endif /* __MDSS_HDMI_MHL_H__ */

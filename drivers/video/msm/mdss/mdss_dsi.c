@@ -180,11 +180,15 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		       __func__, ctrl_pdata->ndx);
 		if (mdss_dsi_labibb_vreg_ctrl(ctrl_pdata, false))
 			pr_err("Unable to disable bias vreg\n");
-		
+		/* Add delay recommended by panel specs */
 		udelay(2000);
 	}
 
 	for (i = DSI_MAX_PM - 1; i >= 0; i--) {
+		/*
+		 * Core power module will be disabled when the
+		 * clocks are disabled
+		 */
 		if (DSI_CORE_PM == i)
 			continue;
 		ret = msm_dss_enable_vreg(
@@ -215,6 +219,10 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 				panel_data);
 
 	for (i = 0; i < DSI_MAX_PM; i++) {
+		/*
+		 * Core power module will be enabled when the
+		 * clocks are enabled
+		 */
 		if (DSI_CORE_PM == i)
 			continue;
 		ret = msm_dss_enable_vreg(
@@ -231,11 +239,17 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 		       __func__, ctrl_pdata->ndx);
 		if (mdss_dsi_labibb_vreg_ctrl(ctrl_pdata, true))
 			pr_err("Unable to configure bias vreg\n");
-		
+		/* Add delay recommended by panel specs */
 		udelay(2000);
 	}
 	i--;
 
+	/*
+	 * If continuous splash screen feature is enabled, then we need to
+	 * request all the GPIOs that have already been configured in the
+	 * bootloader. This needs to be done irresepective of whether
+	 * the lp11_init flag is set or not.
+	 */
 	if (!pdata->panel_info.skip_first_pinctl &&
 		(pdata->panel_info.cont_splash_enabled ||
 		!pdata->panel_info.mipi.lp11_init)) {
@@ -271,7 +285,7 @@ error:
 
 static int mdss_dsi_panel_power_lp(struct mdss_panel_data *pdata, int enable)
 {
-	
+	/* Panel power control when entering/exiting lp mode */
 	return 0;
 }
 
@@ -295,6 +309,10 @@ static int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata,
 		return 0;
 	}
 
+	/*
+	 * If a dynamic mode switch is pending, the regulators should not
+	 * be turned off or on.
+	 */
 	if (pdata->panel_info.dynamic_switch_pending)
 		return 0;
 
@@ -385,7 +403,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 
 	for_each_child_of_node(supply_root_node, supply_node) {
 		const char *st = NULL;
-		
+		/* vreg-name */
 		rc = of_property_read_string(supply_node,
 			"qcom,supply-name", &st);
 		if (rc) {
@@ -395,7 +413,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		}
 		snprintf(mp->vreg_config[i].vreg_name,
 			ARRAY_SIZE((mp->vreg_config[i].vreg_name)), "%s", st);
-		
+		/* vreg-min-voltage */
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-min-voltage", &tmp);
 		if (rc) {
@@ -405,7 +423,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		}
 		mp->vreg_config[i].min_voltage = tmp;
 
-		
+		/* vreg-max-voltage */
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-max-voltage", &tmp);
 		if (rc) {
@@ -415,7 +433,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		}
 		mp->vreg_config[i].max_voltage = tmp;
 
-		
+		/* enable-load */
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-enable-load", &tmp);
 		if (rc) {
@@ -425,7 +443,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		}
 		mp->vreg_config[i].enable_load = tmp;
 
-		
+		/* disable-load */
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-disable-load", &tmp);
 		if (rc) {
@@ -435,7 +453,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		}
 		mp->vreg_config[i].disable_load = tmp;
 
-		
+		/* pre-sleep */
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-pre-on-sleep", &tmp);
 		if (rc) {
@@ -456,7 +474,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 			mp->vreg_config[i].pre_off_sleep = tmp;
 		}
 
-		
+		/* post-sleep */
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-post-on-sleep", &tmp);
 		if (rc) {
@@ -565,10 +583,10 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata, int power_state)
 		mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 1);
 
 	if (!pdata->panel_info.ulps_suspend_enabled) {
-		
+		/* disable DSI controller */
 		mdss_dsi_controller_cfg(0, pdata);
 
-		
+		/* disable DSI phy */
 		mdss_dsi_phy_disable(ctrl_pdata);
 	}
 
@@ -607,7 +625,7 @@ static int mdss_dsi_update_panel_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		pinfo->type = MIPI_CMD_PANEL;
 		pinfo->mipi.vsync_enable = 1;
 		pinfo->mipi.hw_vsync_mode = 1;
-	} else {	
+	} else {	/*video mode*/
 		pinfo->mipi.mode = DSI_VIDEO_MODE;
 		pinfo->type = MIPI_VIDEO_PANEL;
 		pinfo->mipi.vsync_enable = 0;
@@ -646,6 +664,12 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	mipi = &pdata->panel_info.mipi;
 
 	if (mdss_dsi_is_panel_on_interactive(pdata)) {
+		/*
+		 * all interrupts are disabled at LK
+		 * for cont_splash case, intr mask bits need
+		 * to be restored to allow dcs command be
+		 * sent to panel
+		 */
 		mdss_dsi_restore_intr_mask(ctrl_pdata);
 		pr_debug("%s: panel already on\n", __func__);
 		goto end;
@@ -662,6 +686,11 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		goto end;
 	}
 
+	/*
+	 * Enable DSI bus clocks prior to resetting and initializing DSI
+	 * Phy. Phy and ctrl setup need to be done before enabling the link
+	 * clocks.
+	 */
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_BUS_CLKS, 1);
 	if (!pdata->panel_info.ulps_suspend_enabled) {
 		mdss_dsi_phy_sw_reset(ctrl_pdata);
@@ -669,10 +698,14 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		mdss_dsi_ctrl_setup(ctrl_pdata);
 	}
 
-	
+	/* DSI link clocks need to be on prior to ctrl sw reset */
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_LINK_CLKS, 1);
 	mdss_dsi_sw_reset(ctrl_pdata, true);
 
+	/*
+	 * Issue hardware reset line after enabling the DSI clocks and data
+	 * data lanes for LP11 init
+	 */
 	if (mipi->lp11_init) {
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
 			pr_debug("reset enable: pinctrl not enabled\n");
@@ -948,7 +981,7 @@ static void __mdss_dsi_update_video_mode_total(struct mdss_panel_data *pdata,
 				(new_dsi_v_total & 0x7ffffff));
 	}
 	ctrl_rev = MIPI_INP(ctrl_pdata->ctrl_base);
-	
+	/* Flush DSI TIMING registers for 8916/8939 */
 	if (ctrl_pdata->timing_db_mode)
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x1e4, 0x1);
 	ctrl_pdata->panel_data.panel_info.mipi.frame_rate = new_fps;
@@ -1064,11 +1097,11 @@ static int __mdss_dsi_dfps_update_clks(struct mdss_panel_data *pdata,
 			return rc;
 		}
 
-		
+		/* add an extra reference to main clks */
 		clk_prepare_enable(ctrl_pdata->pll_byte_clk);
 		clk_prepare_enable(ctrl_pdata->pll_pixel_clk);
 
-		
+		/* change the parent to shadow clocks*/
 		clk_set_parent(ctrl_pdata->mux_byte_clk,
 				ctrl_pdata->shadow_byte_clk);
 		clk_set_parent(ctrl_pdata->mux_pixel_clk,
@@ -1136,13 +1169,18 @@ static int mdss_dsi_dfps_config(struct mdss_panel_data *pdata, int new_fps)
 		return -EINVAL;
 	}
 
+	/*
+	 * at split display case, DFPS registers were already programmed
+	 * while programming the left ctrl(DSI0). Ignore right ctrl (DSI1)
+	 * reguest.
+	 */
 	pinfo = &pdata->panel_info;
 	if (pinfo->is_split_display) {
 		if (mdss_dsi_is_right_ctrl(ctrl_pdata)) {
 			pr_debug("%s DFPS already updated.\n", __func__);
 			return rc;
 		}
-		
+		/* left ctrl to get right ctrl */
 		sctrl_pdata = mdss_dsi_get_other_ctrl(ctrl_pdata);
 	}
 
@@ -1222,18 +1260,18 @@ static int mdss_dsi_set_stream_size(struct mdss_panel_data *pdata)
 
 	roi = &pinfo->roi;
 
-	
+	/* DSI_COMMAND_MODE_MDP_STREAM_CTRL */
 	data = (((roi->w * 3) + 1) << 16) |
 			(pdata->panel_info.mipi.vc << 8) | DTYPE_DCS_LWRITE;
 	MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x60, data);
 	MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x58, data);
 
-	
+	/* DSI_COMMAND_MODE_MDP_STREAM_TOTAL */
 	data = roi->h << 16 | roi->w;
 	MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x64, data);
 	MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x5C, data);
 
-	
+	/* set idle control -- dsi clk cycle */
 	idle = 0;
 	pidle = ctrl_pdata->line_idle;
 	for (i = 0; i < ctrl_pdata->horizontal_idle_cnt; i++) {
@@ -1248,7 +1286,7 @@ static int mdss_dsi_set_stream_size(struct mdss_panel_data *pdata)
 	}
 
 	if (idle)
-		idle |= BIT(12);	
+		idle |= BIT(12);	/* enable */
 
 	MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x194, idle);
 
@@ -1360,7 +1398,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		break;
 	case MDSS_EVENT_CONT_SPLASH_BEGIN:
 		if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE) {
-			
+			/* Panel is Enabled in Bootloader */
 			rc = mdss_dsi_blank(pdata, MDSS_PANEL_POWER_OFF);
 		}
 		break;
@@ -1401,6 +1439,20 @@ static struct device_node *mdss_dsi_pref_prim_panel(
 	return dsi_pan_node;
 }
 
+/**
+ * mdss_dsi_find_panel_of_node(): find device node of dsi panel
+ * @pdev: platform_device of the dsi ctrl node
+ * @panel_cfg: string containing intf specific config data
+ *
+ * Function finds the panel device node using the interface
+ * specific configuration data. This configuration data is
+ * could be derived from the result of bootloader's GCDB
+ * panel detection mechanism. If such config data doesn't
+ * exist then this panel returns the default panel configured
+ * in the device tree.
+ *
+ * returns pointer to panel node on success, NULL on error.
+ */
 static struct device_node *mdss_dsi_find_panel_of_node(
 		struct platform_device *pdev, char *panel_cfg)
 {
@@ -1413,7 +1465,7 @@ static struct device_node *mdss_dsi_find_panel_of_node(
 
 	len = strlen(panel_cfg);
 	if (!len) {
-		
+		/* no panel cfg chg, parse dt */
 		pr_debug("%s:%d: no cmd line cfg present\n",
 			 __func__, __LINE__);
 		goto end;
@@ -1551,7 +1603,7 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	if (rc)
 		pr_warn("%s: failed to get pin resources\n", __func__);
 
-	
+	/* Parse the regulator information */
 	for (i = 0; i < DSI_MAX_PM; i++) {
 		rc = mdss_dsi_get_dt_vreg_data(&pdev->dev,
 			&ctrl_pdata->power_data[i], i);
@@ -1562,17 +1614,22 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 		}
 	}
 
+	/*
+	 * Currently, the Bias vreg is controlled by wled driver.
+	 * Once we have support from pmic driver, implement the
+	 * bias vreg control using the existing vreg apis.
+	 */
 	ctrl_pdata->panel_bias_vreg = of_property_read_bool(
 			pdev->dev.of_node, "qcom,dsi-panel-bias-vreg");
 
-	
+	/* DSI panels can be different between controllers */
 	rc = mdss_dsi_get_panel_cfg(panel_cfg, ctrl_pdata);
 	if (!rc)
-		
+		/* dsi panel cfg not present */
 		pr_warn("%s:%d:dsi specific cfg not present\n",
 			__func__, __LINE__);
 
-	
+	/* find panel device node */
 	dsi_pan_node = mdss_dsi_find_panel_of_node(pdev, panel_cfg);
 	if (!dsi_pan_node) {
 		pr_err("%s: can't find panel node %s\n", __func__, panel_cfg);
@@ -1865,6 +1922,10 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	pinfo->panel_max_fps = mdss_panel_get_framerate(pinfo);
 	pinfo->panel_max_vtotal = mdss_panel_get_vtotal(pinfo);
 
+	/*
+	 * If disp_en_gpio has been set previously (disp_en_gpio > 0)
+	 *  while parsing the panel node, then do not override it
+	 */
 	if (ctrl_pdata->disp_en_gpio <= 0) {
 		ctrl_pdata->disp_en_gpio = of_get_named_gpio(
 			ctrl_pdev->dev.of_node,
@@ -1953,7 +2014,7 @@ int dsi_panel_device_register(struct device_node *pan_node,
 				ctrl_pdev->dev.of_node, "qcom,dsi-irq-line");
 
 	if (ctrl_pdata->dsi_irq_line) {
-		
+		/* DSI has it's own irq line */
 		res = platform_get_resource(ctrl_pdev, IORESOURCE_IRQ, 0);
 		if (!res || res->start == 0) {
 			pr_err("%s:%d unable to get the MDSS irq resources\n",
@@ -1975,6 +2036,12 @@ int dsi_panel_device_register(struct device_node *pan_node,
 
 	ctrl_pdata->ctrl_state = CTRL_STATE_UNKNOWN;
 
+	/*
+	 * If ULPS during suspend is enabled, add an extra vote for the
+	 * DSI CTRL power module. This keeps the regulator always enabled.
+	 * This is needed for the DSI PHY to maintain ULPS state during
+	 * suspend also.
+	 */
 	if (pinfo->ulps_suspend_enabled) {
 		rc = msm_dss_enable_vreg(
 			ctrl_pdata->power_data[DSI_CTRL_PM].vreg_config,

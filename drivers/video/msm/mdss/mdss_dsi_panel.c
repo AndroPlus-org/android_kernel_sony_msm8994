@@ -107,7 +107,7 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	}
 }
 
-static char dcs_cmd[2] = {0x54, 0x00}; 
+static char dcs_cmd[2] = {0x54, 0x00}; /* DTYPE_DCS_READ */
 static struct dsi_cmd_desc dcs_read_cmd = {
 	{DTYPE_DCS_READ, 1, 0, 1, 5, sizeof(dcs_cmd)},
 	dcs_cmd
@@ -133,8 +133,11 @@ u32 mdss_dsi_panel_cmd_read(struct mdss_dsi_ctrl_pdata *ctrl, char cmd0,
 	cmdreq.flags = CMD_REQ_RX | CMD_REQ_COMMIT;
 	cmdreq.rlen = len;
 	cmdreq.rbuf = rbuf;
-	cmdreq.cb = fxn; 
+	cmdreq.cb = fxn; /* call back */
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+	/*
+	 * blocked here, until call back called
+	 */
 
 	return 0;
 }
@@ -156,7 +159,7 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 	cmdreq.cmds_cnt = pcmds->cmd_cnt;
 	cmdreq.flags = CMD_REQ_COMMIT;
 
-	
+	/*Panel ON/Off commands should be sent in DSI Low Power Mode*/
 	if (pcmds->link_state == DSI_LP_MODE)
 		cmdreq.flags  |= CMD_REQ_LP_MODE;
 
@@ -204,7 +207,7 @@ static unsigned char linear_pwm(int val, int max_brt, int bl_max)
 }
 #endif
 
-static char led_pwm1[2] = {0x51, 0x0};	
+static char led_pwm1[2] = {0x51, 0x0};	/* DTYPE_DCS_WRITE1 */
 static struct dsi_cmd_desc backlight_cmd = {
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(led_pwm1)},
 	led_pwm1
@@ -363,6 +366,12 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 	return rc;
 }
 
+/**
+ * mdss_dsi_roi_merge() -  merge two roi into single roi
+ *
+ * Function used by partial update with only one dsi intf take 2A/2B
+ * (column/page) dcs commands.
+ */
 static int mdss_dsi_roi_merge(struct mdss_dsi_ctrl_pdata *ctrl,
 					struct mdss_rect *roi)
 {
@@ -389,24 +398,25 @@ static int mdss_dsi_roi_merge(struct mdss_dsi_ctrl_pdata *ctrl,
 	}
 
 	if (l_roi->w == 0 && l_roi->h == 0) {
-		
+		/* right only */
 		*roi = *r_roi;
-		roi->x += l_pinfo->xres;
+		roi->x += l_pinfo->xres;/* add left full width to x-offset */
 	} else {
-		
+		/* left only and left+righ */
 		*roi = *l_roi;
-		roi->w +=  r_roi->w; 
+		roi->w +=  r_roi->w; /* add right width */
 		ans = 1;
 	}
 
 	return ans;
 }
 
-static char caset[] = {0x2a, 0x00, 0x00, 0x03, 0x00};	
-static char paset[] = {0x2b, 0x00, 0x00, 0x05, 0x00};	
+static char caset[] = {0x2a, 0x00, 0x00, 0x03, 0x00};	/* DTYPE_DCS_LWRITE */
+static char paset[] = {0x2b, 0x00, 0x00, 0x05, 0x00};	/* DTYPE_DCS_LWRITE */
 
+/* pack into one frame before sent */
 static struct dsi_cmd_desc set_col_page_addr_cmd[] = {
-	{{DTYPE_DCS_LWRITE, 0, 0, 0, 1, sizeof(caset)}, caset},	
+	{{DTYPE_DCS_LWRITE, 0, 0, 0, 1, sizeof(caset)}, caset},	/* packed */
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 1, sizeof(paset)}, paset},
 };
 
@@ -460,6 +470,14 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 	pinfo = &pdata->panel_info;
 	p_roi = &pinfo->roi;
 
+	/*
+	 * to avoid keep sending same col_page info to panel,
+	 * if roi_merge enabled, the roi of left ctrl is used
+	 * to compare against new merged roi and saved new
+	 * merged roi to it after comparing.
+	 * if roi_merge disabled, then the calling ctrl's roi
+	 * and pinfo's roi are used to compare.
+	 */
 	if (pinfo->partial_update_roi_merge) {
 		left_or_both = mdss_dsi_roi_merge(ctrl, &roi);
 		other = mdss_dsi_get_ctrl_by_index(DSI_CTRL_LEFT);
@@ -469,15 +487,15 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 		roi = *p_roi;
 	}
 
-	
+	/* roi had changed, do col_page update */
 	if (!mdss_rect_cmp(c_roi, &roi)) {
 		pr_debug("%s: ndx=%d x=%d y=%d w=%d h=%d\n",
 				__func__, ctrl->ndx, p_roi->x,
 				p_roi->y, p_roi->w, p_roi->h);
 
-		*c_roi = roi; 
+		*c_roi = roi; /* keep to ctrl */
 		if (c_roi->w == 0 || c_roi->h == 0) {
-			
+			/* no new frame update */
 			pr_debug("%s: ctrl=%d, no partial roi set\n",
 						__func__, ctrl->ndx);
 			return 0;
@@ -485,7 +503,7 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 
 		if (pinfo->dcs_cmd_by_left) {
 			if (left_or_both && ctrl->ndx == DSI_CTRL_RIGHT) {
-				
+				/* 2A/2B sent by left already */
 				return 0;
 			}
 		}
@@ -496,13 +514,18 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 							DSI_CTRL_LEFT);
 			mdss_dsi_send_col_page_addr(ctrl, &roi, 0);
 		} else {
+			/*
+			 * when sync_wait_broadcast enabled,
+			 * need trigger at right ctrl to
+			 * start both dcs cmd transmission
+			 */
 			other = mdss_dsi_get_other_ctrl(ctrl);
 			if (!other)
 				goto end;
 
 			if (mdss_dsi_is_left_ctrl(ctrl)) {
 				if (pinfo->partial_update_roi_merge) {
-					
+					/* to dsi-1 only */
 					mdss_dsi_send_col_page_addr(other,
 							&other->roi, 0);
 				} else {
@@ -513,7 +536,7 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 				}
 			} else {
 				if (pinfo->partial_update_roi_merge) {
-					
+					/* to dsi-1 only */
 					mdss_dsi_send_col_page_addr(ctrl,
 							&ctrl->roi, 0);
 				} else {
@@ -574,6 +597,11 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
+	/*
+	 * Some backlight controllers specify a minimum duty cycle
+	 * for the backlight brightness. If the brightness is less
+	 * than it, the controller can malfunction.
+	 */
 
 	if ((bl_level < pdata->panel_info.bl_min) && (bl_level != 0))
 		bl_level = pdata->panel_info.bl_min;
@@ -599,6 +627,14 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 			mdss_dsi_panel_bklt_dcs(ctrl_pdata, bl_level);
 			break;
 		}
+		/*
+		 * DCS commands to update backlight are usually sent at
+		 * the same time to both the controllers. However, if
+		 * sync_wait is enabled, we need to ensure that the
+		 * dcs commands are first sent to the non-trigger
+		 * controller so that when the commands are triggered,
+		 * both controllers receive it at the same time.
+		 */
 		sctrl = mdss_dsi_get_other_ctrl(ctrl_pdata);
 		if (mdss_dsi_sync_wait_trigger(ctrl_pdata)) {
 			if (sctrl)
@@ -697,7 +733,7 @@ static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
 	pr_debug("%s: ctrl=%p ndx=%d enable=%d\n", __func__, ctrl, ctrl->ndx,
 		enable);
 
-	
+	/* Any panel specific low power commands/config */
 	if (enable)
 		pinfo->blank_state = MDSS_PANEL_BLANK_LOW_POWER;
 	else
@@ -772,7 +808,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 
 	memcpy(buf, data, blen);
 
-	
+	/* scan dcs commands */
 	bp = buf;
 	len = blen;
 	cnt = 0;
@@ -818,7 +854,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		len -= dchdr->dlen;
 	}
 
-	
+	/*Set default link state to LP Mode*/
 	pcmds->link_state = DSI_LP_MODE;
 
 	if (link_key) {
@@ -979,6 +1015,12 @@ static void mdss_panel_parse_te_params(struct device_node *np,
 
 	u32 tmp;
 	int rc = 0;
+	/*
+	 * TE default: dsi byte clock calculated base on 70 fps;
+	 * around 14 ms to complete a kickoff cycle if te disabled;
+	 * vclk_line base on 60 fps; write is faster than read;
+	 * init == start == rdptr;
+	 */
 	panel_info->te.tear_check_en =
 		!of_property_read_bool(np, "qcom,mdss-tear-check-disable");
 	rc = of_property_read_u32
@@ -1293,7 +1335,7 @@ static void mdss_dsi_parse_panel_horizintal_line_idle(struct device_node *np,
 	if (!src || len == 0)
 		return;
 
-	cnt = len % 3; 
+	cnt = len % 3; /* 3 fields per entry */
 	if (cnt) {
 		pr_err("%s: invalid horizontal idle len=%d\n", __func__, len);
 		return;
@@ -1331,6 +1373,10 @@ static int mdss_dsi_set_refresh_rate_range(struct device_node *pan_node,
 		pr_warn("%s:%d, Unable to read min refresh rate\n",
 				__func__, __LINE__);
 
+		/*
+		 * Since min refresh rate is not specified when dynamic
+		 * fps is enabled, using minimum as 30
+		 */
 		pinfo->min_fps = MIN_REFRESH_RATE;
 		rc = 0;
 	}
@@ -1342,6 +1388,11 @@ static int mdss_dsi_set_refresh_rate_range(struct device_node *pan_node,
 		pr_warn("%s:%d, Unable to read max refresh rate\n",
 				__func__, __LINE__);
 
+		/*
+		 * Since max refresh rate was not specified when dynamic
+		 * fps is enabled, using the default panel refresh rate
+		 * as max refresh rate supported.
+		 */
 		pinfo->max_fps = pinfo->mipi.frame_rate;
 		rc = 0;
 	}
