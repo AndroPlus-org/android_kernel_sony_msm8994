@@ -55,7 +55,11 @@ static int sony_ric_bdev_mount_perm(const char *volname, struct path *path,
 	if (!bdev_info)
 		return 0;
 
-	for (i = 0; i < num_partitions; i++) {
+	/*
+	 * Tommy-Geenexus:
+	 * Skip /system in the loop to prevent permission restrictions
+	 */
+	for (i = 1; i < num_partitions; i++) {
 		part = &bdev_info[i];
 		if (part->name && !strncmp(part->name, volname, 64)) {
 			match = 1;
