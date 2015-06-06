@@ -1,0 +1,34 @@
+### GCC 4.9.x
+
+if [ ! -e ./arch/arm/boot/msm8974pro-ac-shinano_leo.dtb ]; then
+rm ./arch/arm/boot/*.dtb
+fi
+
+### get defconfig
+#ARCH=arm64 CROSS_COMPILE=~/arm-cortex_a15-linux-gnueabihf-linaro_4.9.1-2014.04/bin/arm-gnueabi- make leo_defconfig
+ARCH=arm64 CROSS_COMPILE=~/UBERTC-arm-eabi-4.9-cc946e382b79/bin/arm-eabi- KBUILD_DIFFCONFIG=karin_diffconfig make kitakami_defconfig
+
+### compile kernel
+#ARCH=arm64 CROSS_COMPILE=~/arm-cortex_a15-linux-gnueabihf-linaro_4.9.1-2014.04/bin/arm-gnueabi- make -j8
+ARCH=arm64 CROSS_COMPILE=~/UBERTC-arm-eabi-4.9-cc946e382b79/bin/arm-eabi- make -j8
+
+echo "checking for compiled kernel..."
+if [ -f arch/arm64/boot/Image ]
+then
+
+echo "generating device tree..."
+../final_files/dtbToolCM --force-v2 -o ../final_files/dt.img -s 2048 -p ./scripts/dtc/ ./arch/arm/boot/dts/
+
+### copy zImage
+cp arch/arm64/boot/Image ../final_files/. 
+
+echo "DONE"
+
+fi
+
+### D6603
+../final_files/mkbootimg --cmdline "androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 boot_cpus=0-5 dwc3_msm.prop_chg_detect=Y coherent_pool=2M androidboot.selinux=permissive" --base 0x00000000 --kernel ../final_files/Image --ramdisk ../final_files/ramdiskSGP771.cpio.gz --ramdisk_offset 0x02000000 --pagesize 4096 -o ../final_files/boot_SGP771.img --dt ../final_files/dt.img --tags_offset 0x01E00000
+
+
+### Copy img to my desktop
+dd if=../final_files/boot_SGP771.img of="/mnt/hgfs/VMShare/AndroidImageKitchen20/boot_SGP771.img"
