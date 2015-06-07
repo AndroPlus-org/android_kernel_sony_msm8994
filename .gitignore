@@ -94,16 +94,17 @@ modules
 stock
 \#*#
 
+usr/gen_init_cpio
 usr/initramfs_data.cpio
 arch/arm/boot/compressed/piggy.xzkern
-arch/arm/boot/*.dtb
+arch/arm/boot/dts/*.dtb
 Module.symvers
 System.map
 vmlinux
 kernel/config_data.h
 boot*.img
 dt.img
-arch/arm/boot/Image
+arch/arm64/boot/Image
 arch/arm/boot/compressed/vmlinux
 arch/arm/boot/zImage
 
