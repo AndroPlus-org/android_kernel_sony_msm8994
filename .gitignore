@@ -118,6 +118,7 @@ arch/arm/boot/compressed/vmlinux.lds
 arch/arm/boot/uImage
 arch/arm/boot/zImage
 arch/arm/kernel/vmlinux.lds
+arch/arm64/kernel/vmlinux.lds
 kernel/timeconst.h
 lib/crc32table.h
 lib/gen_crc32table
@@ -140,3 +141,8 @@ drivers/video/logo/
 *.symvers
 scripts/pnmtologo
 scripts/kconfig/mconf
+
+vdso.lds
+vdso-offsets.h
+kernel/hz.bc
+devicetable-offsets.h
