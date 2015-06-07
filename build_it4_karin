@@ -5,12 +5,12 @@ rm ./arch/arm/boot/*.dtb
 fi
 
 ### get defconfig
-#ARCH=arm64 CROSS_COMPILE=~/arm-cortex_a15-linux-gnueabihf-linaro_4.9.1-2014.04/bin/arm-gnueabi- make leo_defconfig
-ARCH=arm64 CROSS_COMPILE=~/UBERTC-arm-eabi-4.9-cc946e382b79/bin/arm-eabi- KBUILD_DIFFCONFIG=karin_diffconfig make kitakami_defconfig
+ARCH=arm64 CROSS_COMPILE=~/aarch64-linux-android-4.9/bin/aarch64-linux-android- KBUILD_DIFFCONFIG=karin_diffconfig make kitakami_defconfig
+#ARCH=arm64 CROSS_COMPILE=~/UBERTC-aarch64-linux-android-4.9-kernel-4e03aaa93230/bin/aarch64-linux-android- KBUILD_DIFFCONFIG=karin_diffconfig make kitakami_defconfig
 
 ### compile kernel
-#ARCH=arm64 CROSS_COMPILE=~/arm-cortex_a15-linux-gnueabihf-linaro_4.9.1-2014.04/bin/arm-gnueabi- make -j8
-ARCH=arm64 CROSS_COMPILE=~/UBERTC-arm-eabi-4.9-cc946e382b79/bin/arm-eabi- make -j8
+ARCH=arm64 CROSS_COMPILE=~/aarch64-linux-android-4.9/bin/aarch64-linux-android- make -j8
+#ARCH=arm64 CROSS_COMPILE=~/UBERTC-aarch64-linux-android-4.9-kernel-4e03aaa93230/bin/aarch64-linux-android- make -j8
 
 echo "checking for compiled kernel..."
 if [ -f arch/arm64/boot/Image ]
