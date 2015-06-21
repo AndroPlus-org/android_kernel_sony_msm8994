@@ -26,8 +26,8 @@ echo "DONE"
 
 fi
 
-### D6603
-../final_files/mkbootimg --cmdline "androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 boot_cpus=0-5 dwc3_msm.prop_chg_detect=Y coherent_pool=2M androidboot.selinux=permissive" --base 0x00000000 --kernel ../final_files/Image --ramdisk ../final_files/ramdiskSGP771.cpio.gz --ramdisk_offset 0x02000000 --pagesize 4096 -o ../final_files/boot_SGP771.img --dt ../final_files/dt.img --tags_offset 0x01E00000
+### SGP771
+../final_files/mkbootimg --cmdline "androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 boot_cpus=0-5 dwc3_msm.prop_chg_detect=Y coherent_pool=2M androidboot.selinux=permissive" --base 0x00000000 --kernel ../final_files/Image --ramdisk ../final_files/ramdiskSGP771.img --ramdisk_offset 0x02000000 --pagesize 4096 -o ../final_files/boot_SGP771.img --dt ../final_files/dt.img --tags_offset 0x01E00000
 
 
 ### Copy img to my desktop
