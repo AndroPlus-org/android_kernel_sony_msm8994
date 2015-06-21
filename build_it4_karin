@@ -1,7 +1,7 @@
 ### GCC 4.9.x
 
 if [ ! -e ./arch/arm/boot/dts/msm8994-v1-kitakami_karin_generic.dtb ]; then
-rm ./arch/arm/boot/*.dtb
+rm ./arch/arm/boot/dts/*.dtb
 fi
 
 ### get defconfig
