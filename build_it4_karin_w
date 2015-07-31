@@ -24,7 +24,7 @@ make dtbs
 ../final_files/dtbToolCM --force-v2 -o ../final_files/dt.img -s 2048 -p ./scripts/dtc/ ./arch/arm/boot/dts/
 
 ### copy zImage
-#cp arch/arm64/boot/Image.gz ../final_files/. 
+#cp arch/arm64/boot/Image ../final_files/. 
 
 echo "DONE"
 
