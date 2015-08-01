@@ -729,9 +729,11 @@ static noinline int avc_denied(u32 ssid, u32 tsid,
 			 unsigned flags,
 			 struct av_decision *avd)
 {
-	//ew if (flags & AVC_STRICT) return -EACCES;
+	if (flags & AVC_STRICT)
+		return -EACCES;
 
-	//ew if (selinux_enforcing && !(avd->flags & AVD_FLAGS_PERMISSIVE)) return -EACCES;
+	if (selinux_enforcing && !(avd->flags & AVD_FLAGS_PERMISSIVE))
+		return -EACCES;
 
 	avc_update_node(AVC_CALLBACK_GRANT, requested, ssid,
 				tsid, tclass, avd->seqno);
@@ -785,9 +787,7 @@ inline int avc_has_perm_noaudit(u32 ssid, u32 tsid,
 		rc = avc_denied(ssid, tsid, tclass, requested, flags, avd);
 
 	rcu_read_unlock();
-	
-	//ew
-	return 0;
+	return rc;
 }
 
 /**
@@ -815,14 +815,9 @@ int avc_has_perm_flags(u32 ssid, u32 tsid, u16 tclass,
 	int rc, rc2;
 
 	rc = avc_has_perm_noaudit(ssid, tsid, tclass, requested, 0, &avd);
-	//ew
-	rc = 0;
 
 	rc2 = avc_audit(ssid, tsid, tclass, requested, &avd, rc, auditdata,
 			flags);
-	//ew
-	rc2 = 0;
-	
 	if (rc2)
 		return rc2;
 	return rc;
