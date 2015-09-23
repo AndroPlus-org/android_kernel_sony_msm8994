@@ -350,6 +350,7 @@ struct maxim_sti_pdata {
 	void      (*reset)(struct maxim_sti_pdata *pdata, int value);
 	int       (*irq)(struct maxim_sti_pdata *pdata);
 	u32       wakeup_gesture_support;
+	u32       stylus_support;
 };
 #endif
 
