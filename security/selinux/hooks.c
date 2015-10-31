@@ -2132,10 +2132,9 @@ static int selinux_bprm_set_creds(struct linux_binprm *bprm)
 		/*
 		 * Minimize confusion: if no_new_privs and a transition is
 		 * explicitly requested, then fail the exec.
-		//ew 
+		 */
 		if (bprm->unsafe & LSM_UNSAFE_NO_NEW_PRIVS)
 			return -EPERM;
-		*/
 	} else {
 		/* Check for a default transition on this program. */
 		rc = security_transition_sid(old_tsec->sid, isec->sid,
@@ -2174,7 +2173,8 @@ static int selinux_bprm_set_creds(struct linux_binprm *bprm)
 			rc = avc_has_perm(old_tsec->sid, new_tsec->sid,
 					  SECCLASS_PROCESS, PROCESS__SHARE,
 					  NULL);
-			// ew if (rc) return -EPERM;
+			if (rc)
+				return -EPERM;
 		}
 
 		/* Make sure that anyone attempting to ptrace over a task that
@@ -2197,7 +2197,8 @@ static int selinux_bprm_set_creds(struct linux_binprm *bprm)
 				rc = avc_has_perm(ptsid, new_tsec->sid,
 						  SECCLASS_PROCESS,
 						  PROCESS__PTRACE, NULL);
-				//ew if (rc)return -EPERM;
+				if (rc)
+					return -EPERM;
 			}
 		}
 
@@ -2865,7 +2866,20 @@ static int selinux_inode_setotherxattr(struct dentry *dentry, const char *name)
 {
 	const struct cred *cred = current_cred();
 
-	//ew einige Abfragen in Richtung EACCES gelöscht
+	if (pft_inode_set_xattr(dentry, name, NULL, 0, 0) < 0)
+		return -EACCES;
+
+	if (!strncmp(name, XATTR_SECURITY_PREFIX,
+		     sizeof XATTR_SECURITY_PREFIX - 1)) {
+		if (!strcmp(name, XATTR_NAME_CAPS)) {
+			if (!capable(CAP_SETFCAP))
+				return -EPERM;
+		} else if (!capable(CAP_SYS_ADMIN)) {
+			/* A different attribute in the security namespace.
+			   Restrict to administrator. */
+			return -EPERM;
+		}
+	}
 
 	/* Not an attribute we recognize, so just check the
 	   ordinary setattr permission. */
@@ -2889,7 +2903,8 @@ static int selinux_inode_setxattr(struct dentry *dentry, const char *name,
 	if (!(sbsec->flags & SE_SBLABELSUPP))
 		return -EOPNOTSUPP;
 
-	//ew if (!inode_owner_or_capable(inode)) return -EPERM;
+	if (!inode_owner_or_capable(inode))
+		return -EPERM;
 
 	ad.type = LSM_AUDIT_DATA_DENTRY;
 	ad.u.dentry = dentry;
@@ -2994,7 +3009,7 @@ static int selinux_inode_removexattr(struct dentry *dentry, const char *name)
 
 	/* No one is allowed to remove a SELinux security label.
 	   You can change the label, but all data must be labeled. */
-	return 0; //ew -EACCES;
+	return -EACCES;
 }
 
 /*
@@ -3050,7 +3065,8 @@ static int selinux_inode_setsecurity(struct inode *inode, const char *name,
 	if (strcmp(name, XATTR_SELINUX_SUFFIX))
 		return -EOPNOTSUPP;
 
-	//ew if (!value || !size) return -EACCES;
+	if (!value || !size)
+		return -EACCES;
 
 	rc = security_context_to_sid((void *)value, size, &newsid);
 	if (rc)
@@ -3870,7 +3886,7 @@ static int selinux_skb_peerlbl_sid(struct sk_buff *skb, u16 family, u32 *sid)
 		printk(KERN_WARNING
 		       "SELinux: failure in selinux_skb_peerlbl_sid(),"
 		       " unable to determine packet's peer label\n");
-		//ew return -EACCES;
+		return -EACCES;
 	}
 
 	return 0;
@@ -5525,8 +5541,12 @@ static int selinux_setprocattr(struct task_struct *p,
 	int error;
 	char *str = value;
 
-	//ew Abfrage if (current != p) -> EACCES gelöscht
-	
+	if (current != p) {
+		/* SELinux only allows a process to change its own
+		   security attributes. */
+		return -EACCES;
+	}
+
 	/*
 	 * Basic control over ability to set these attributes at all.
 	 * current == p, but we'll pass them separately in case the
@@ -5607,7 +5627,7 @@ static int selinux_setprocattr(struct task_struct *p,
 			goto abort_change;
 
 		/* Only allow single threaded processes to change context */
-		error = 0; //ew -EPERM;
+		error = -EPERM;
 		if (!current_is_single_threaded()) {
 			error = security_bounded_transition(tsec->sid, sid);
 			if (error)

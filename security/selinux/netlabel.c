@@ -381,8 +381,7 @@ int selinux_netlbl_sock_rcv_skb(struct sk_security_struct *sksec,
 
 	if (nlbl_sid != SECINITSID_UNLABELED)
 		netlbl_skbuff_err(skb, rc, 0);
-	//ew
-	return 0;
+	return rc;
 }
 
 /**
@@ -414,8 +413,9 @@ int selinux_netlbl_socket_setsockopt(struct socket *sock,
 		lock_sock(sk);
 		rc = netlbl_sock_getattr(sk, &secattr);
 		release_sock(sk);
-		//ew if (rc == 0) rc = -EACCES; else 
-		if (rc == -ENOMSG)
+		if (rc == 0)
+			rc = -EACCES;
+		else if (rc == -ENOMSG)
 			rc = 0;
 		netlbl_secattr_destroy(&secattr);
 	}
