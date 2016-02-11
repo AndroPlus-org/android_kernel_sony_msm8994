@@ -1614,7 +1614,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		if (!use_fb_notifier)
 			state_resume();
 #endif
-		pdata->panel_info.esd_rdy = true;
 		lcd_notifier_call_chain(LCD_EVENT_ON_END, NULL);
 		break;
 	case MDSS_EVENT_BLANK:
