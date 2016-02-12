@@ -41,10 +41,6 @@
 
 #define XO_CLK_RATE	19200000
 
-#ifdef CONFIG_STATE_NOTIFIER
-#include <linux/state_notifier.h>
-#endif
-
 static struct dsi_drv_cm_data shared_ctrl_data;
 
 #ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
@@ -1610,10 +1606,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		ctrl_pdata->ctrl_state |= CTRL_STATE_MDP_ACTIVE;
 		if (ctrl_pdata->on_cmds.link_state == DSI_HS_MODE)
 			rc = mdss_dsi_unblank(pdata);
-#ifdef CONFIG_STATE_NOTIFIER
-		if (!use_fb_notifier)
-			state_resume();
-#endif
 		lcd_notifier_call_chain(LCD_EVENT_ON_END, NULL);
 		break;
 	case MDSS_EVENT_BLANK:
@@ -1628,10 +1620,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_blank(pdata, power_state);
 		rc = mdss_dsi_off(pdata, power_state);
-#ifdef CONFIG_STATE_NOTIFIER
-		if (!use_fb_notifier)
-			state_suspend();
-#endif
 		lcd_notifier_call_chain(LCD_EVENT_OFF_END, NULL);
 		break;
 	case MDSS_EVENT_CONT_SPLASH_FINISH:
